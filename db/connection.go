@@ -14,7 +14,6 @@ func (db *DB) Init() {
 	var err error
 	dbUrl := fmt.Sprintf("postgres://%s:%s@%s/%s", os.Getenv("DB_USERNAME"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_HOST"), os.Getenv("DB_NAME"))
 
-	// создаем конфиг
 	config, err := pgxpool.ParseConfig(dbUrl)
 	if err != nil {
 		log.Fatalf("%v: Init() error: %s\n", db.name, err)
