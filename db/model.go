@@ -7,25 +7,25 @@ type Order struct {
 	Locale            string       `json:"locale"`
 	CustomerID        string       `json:"customer_id"`
 	Items             []OrderItems `json:"items"`
+	Payment           Payment      `json:"payment"`
 
-	Delivery      Delivery `json:"delivery"`
-	Shardkey      int      `json:"shardkey"`
-	SmID          int      `json:"sm_id"`
-	TransactionID string   `json:"transaction_id"`
-	DataCreated   string   `json:"Data_Created"`
-	OffShard      string   `json:"off_shard"`
+	DeliveryService string `json:"delivery"`
+	Shardkey        string `json:"shardkey"`
+	SmID            int    `json:"sm_id"`
+	TransactionID   string `json:"transaction_id"`
+	DataCreated     string `json:"Data_Created"`
+	OffShard        int    `json:"off_shard"`
 }
 
 type Payment struct {
-	TransactionID string `json:"transaction_id"`
-	RequestID     string `json:"request_id"`
-	Currency      string `json:"currency"`
-	Provider      string `json:"provider"`
-	Amount        int    `json:"amount"`
-	PaymentDt     int    `json:"payment_dt"`
-	Bank          string `json:"bank"`
-	DeliveryCost  int    `json:"delivery_cost"`
-	GoodsTotal    int    `json:"goods_total"`
+	Transaction  string `json:"transaction"`
+	Currency     string `json:"currency"`
+	Provider     string `json:"provider"`
+	Amount       int    `json:"amount"`
+	PaymentDt    int    `json:"payment_dt"`
+	Bank         string `json:"bank"`
+	DeliveryCost int    `json:"delivery_cost"`
+	GoodsTotal   int    `json:"goods_total"`
 }
 type Delivery struct {
 	DeliveryID int    `json:"delivery_id"`

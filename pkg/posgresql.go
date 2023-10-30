@@ -12,7 +12,3 @@ type Client interface {
 	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
-
-//func NewClient(ctx context.Context, maxAttemps int, username, password, host, port, database string) {
-//	dns.fmtSpri
-//}

@@ -81,22 +81,38 @@ func (db *DB) GetOrderByID(oid int64) (Order, error) {
 	var payment_id_fk int64
 
 	// Сбор данных об Order
-	err := db.pool.QueryRow(context.Background(), `SELECT OrderUID, Entry, InternalSignature, payment_id_fk, Locale, CustomerID, 
-	TrackNumber, DeliveryService, Shardkey, SmID FROM orders WHERE id = $1`, oid).Scan(&o.OrderUID, &o.Entry,
-		&o.InternalSignature, &payment_id_fk, &o.Locale, &o.CustomerID, &o.Shardkey,
-		&o.SmID)
+	err := db.pool.QueryRow(context.Background(), `SELECT OrderUID, Entry, InternalSignature, Locale, CustomerID, 
+	 DeliveryService,payment_id_fk, Shardkey, SmID FROM orders WHERE id = $1`, oid).Scan(
+		&o.OrderUID,
+		&o.Entry,
+		&o.InternalSignature,
+		&o.Locale,
+		&o.CustomerID,
+		&o.DeliveryService,
+		&payment_id_fk,
+		&o.Shardkey,
+		&o.SmID,
+	)
 	if err != nil {
 		return o, errors.New("unable to get order from database")
 	}
 
 	// Сбор данных о Payment
-	//err = db.pool.QueryRow(context.Background(), `SELECT Transaction, Currency, Provider, Amount, PaymentDt, Bank, DeliveryCost,
-	//GoodsTotal FROM payment WHERE id = $1`, payment_id_fk).Scan(&o.Payment.Transaction, &o.Payment.Currency, &o.Payment.Provider,
-	//	&o.Payment.Amount, &o.Payment.PaymentDt, &o.Payment.Bank, &o.Payment.DeliveryCost, &o.Payment.GoodsTotal)
-	//if err != nil {
-	//	log.Printf("%v: unable to get payment from database: %v\n", db.name, err)
-	//	return o, errors.New("unable to get payment from database")
-	//}
+	err = db.pool.QueryRow(context.Background(), `SELECT Transaction, Currency, Provider, Amount, PaymentDt, Bank, DeliveryCost,
+		GoodsTotal FROM payment WHERE id = $1`, payment_id_fk).Scan(
+		&o.Payment.Transaction,
+		&o.Payment.Currency,
+		&o.Payment.Provider,
+		&o.Payment.Amount,
+		&o.Payment.PaymentDt,
+		&o.Payment.Bank,
+		&o.Payment.DeliveryCost,
+		&o.Payment.GoodsTotal,
+	)
+	if err != nil {
+		log.Printf("%v: unable to get payment from database: %v\n", db.name, err)
+		return o, errors.New("unable to get payment from database")
+	}
 
 	// Сбор всех ItemsID для Order
 	rowsItems, err := db.pool.Query(context.Background(), "SELECT item_id_fk FROM order_items WHERE order_id_fk = $1", oid)
@@ -113,14 +129,15 @@ func (db *DB) GetOrderByID(oid int64) (Order, error) {
 			return o, errors.New("unable to get itemID from database row")
 		}
 		// Сбор данных об Items
-		err = db.pool.QueryRow(context.Background(), `SELECT ChrtID, Price, Rid, Name, Sale, Size, TotalPrice, NmID, Brand 
-		FROM order_items WHERE id = $1`, itemID).Scan(&item.ChrtID, &item.Price, &item.Rid, &item.Name, &item.Sale, &item.Size,
+		err = db.pool.QueryRow(context.Background(), `SELECT ChrtID, Price, Rid, Name, Sale, Size, TotalPrice, NmID, Brand
+			FROM items WHERE id = $1`, itemID).Scan(&item.ChrtID, &item.Price, &item.Rid, &item.Name, &item.Sale, &item.Size,
 			&item.TotalPrice, &item.NmID, &item.Brand)
 		if err != nil {
 			return o, errors.New("unable to get item from database")
 		}
 		o.Items = append(o.Items, item)
 	}
+
 	return o, nil
 }
 
@@ -128,7 +145,7 @@ func (db *DB) GetOrderByID(oid int64) (Order, error) {
 func (db *DB) AddOrder(o Order) (int64, error) {
 	var lastInsertId int64
 	var itemsIds []int64 = []int64{}
-
+	//var orderIdFk int64
 	tx, err := db.pool.Begin(context.Background())
 	if err != nil {
 		return 0, err
@@ -148,25 +165,47 @@ func (db *DB) AddOrder(o Order) (int64, error) {
 	}
 
 	// Добавление Payment
-	//err = tx.QueryRow(context.Background(), `INSERT INTO payment (Transaction, Currency, Provider, Amount, PaymentDt, Bank, DeliveryCost,
-	//	 GoodsTotal) values ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`, o.Payment.Transaction, o.Payment.Currency, o.Payment.Provider,
-	//	o.Payment.Amount, o.Payment.PaymentDt, o.Payment.Bank, o.Payment.DeliveryCost, o.Payment.GoodsTotal).Scan(&lastInsertId)
-	//if err != nil {
-	//	log.Printf("%v: unable to insert data (payment): %v\n", db.name, err)
-	//	return -1, err
-	//}
-	paymentIdFk := lastInsertId
+	err = tx.QueryRow(
+		context.Background(),
+		`INSERT INTO payment (Transaction, Currency, Provider, Amount, PaymentDt, Bank, DeliveryCost,
+			 GoodsTotal) values ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		o.Payment.Transaction,
+		o.Payment.Currency,
+		o.Payment.Provider,
+		o.Payment.Amount,
+		o.Payment.PaymentDt,
+		o.Payment.Bank,
+		o.Payment.DeliveryCost,
+		o.Payment.GoodsTotal,
+	).Scan(&lastInsertId)
+	if err != nil {
+		log.Printf("%v: unable to insert data (payment): %v\n", db.name, err)
+		return -1, err
+	}
+
+	paymentIdfk := lastInsertId
 
 	// Добавление Order
-	err = tx.QueryRow(context.Background(), `INSERT INTO orders (OrderUID, Entry, InternalSignature, payment_id_fk, Locale, 
-		CustomerID, TrackNumber, DeliveryService, Shardkey, SmID) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING id`,
-		o.OrderUID, o.Entry, o.InternalSignature, paymentIdFk, o.Locale, o.CustomerID,
-		o.Shardkey, o.SmID).Scan(&lastInsertId)
+	err = tx.QueryRow(
+		context.Background(),
+		`INSERT INTO orders (OrderUID, Entry, InternalSignature,  Locale,
+			CustomerID,  DeliveryService,payment_id_fk, Shardkey, SmID) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			RETURNING id`,
+		o.OrderUID,
+		o.Entry,
+		o.InternalSignature,
+		o.Locale,
+		o.CustomerID,
+		o.DeliveryService,
+		paymentIdfk,
+		o.Shardkey,
+		o.SmID,
+	).Scan(&lastInsertId)
 	if err != nil {
 		log.Printf("%v: unable to insert data (orders): %v\n", db.name, err)
 		return -1, err
 	}
+
 	orderIdFk := lastInsertId
 
 	// Разрешение связей один-ко-многим для Order и Order.Items[]

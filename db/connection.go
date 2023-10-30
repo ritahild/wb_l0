@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-// Инициализация пула соединений
 func (db *DB) Init() {
 	db.name = "Postgres"
 	var err error

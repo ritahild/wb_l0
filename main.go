@@ -21,17 +21,13 @@ import (
 
 func main() {
 
-	// Инициализация конфигурации проекта
 	ConfigSetup()
 	dbObject := db.NewDB()
 	csh := db.NewCache(dbObject)
 	sh := streaming.NewStreamingHandler(dbObject)
 
-	// Запуск сервера для выдачи OrderOut по адресу http://localhost:3333/orders/123
 	myJoint := NewJoint(csh)
 
-	// Wait for a SIGINT (perhaps triggered by user with CTRL-C)
-	// Run cleanup when signal is received
 	signalChan := make(chan os.Signal, 1)
 	cleanupDone := make(chan bool)
 	signal.Notify(signalChan, os.Interrupt)
@@ -66,14 +62,12 @@ func NewJoint(csh *db.Cache) *Joint {
 	return &api
 }
 
-// Инициализация сервера
 func (a *Joint) Init(csh *db.Cache) {
 	a.csh = csh
 	a.name = "API"
 	a.rtr = chi.NewRouter()
 	a.rtr.Get("/", a.WellcomeHandler)
 
-	// RESTy routes https://github.com/go-chi/chi
 	a.rtr.Route("/orders", func(r chi.Router) {
 		r.Route("/{orderID}", func(r chi.Router) {
 			r.Use(a.orderCtx)
@@ -86,21 +80,17 @@ func (a *Joint) Init(csh *db.Cache) {
 	a.StartServer()
 }
 
-// Корректное завершение работы сервера
 func (a *Joint) Finish() {
 	log.Printf("%v: Выключение сервера...\n", a.name)
 
-	// now close the server gracefully ("shutdown")
 	if err := a.srv.Shutdown(context.Background()); err != nil {
 		panic(err) // failure/timeout shutting down the server gracefully
 	}
 
-	// wait for goroutine started in startHttpServer() to stop
 	a.httpServerExitDone.Wait()
 	log.Printf("%v: Сервер успешно выключен!\n", a.name)
 }
 
-// Запуск сервера в отдельном потоке (для корректного завершения работы программы: очистка кеша из БД, отключение от подписки)
 func (a *Joint) StartServer() {
 	a.srv = &http.Server{
 		Addr:    ":3333",
@@ -111,7 +101,7 @@ func (a *Joint) StartServer() {
 		defer a.httpServerExitDone.Done() // let main know we are done cleaning up
 
 		log.Printf("%v: сервер будет запущен по адресу http://localhost:3333\n", a.name)
-		// always returns error. ErrServerClosed on graceful close
+
 		if err := a.srv.ListenAndServe(); err != http.ErrServerClosed {
 			// unexpected error. port in use?
 			log.Printf("ListenAndServe() error: %v", err)
@@ -120,7 +110,6 @@ func (a *Joint) StartServer() {
 	}()
 }
 
-// Мидлвара, сохраняющая в контекст Order
 func (a *Joint) orderCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		orderIDstr := chi.URLParam(r, "orderID")
@@ -132,21 +121,20 @@ func (a *Joint) orderCtx(next http.Handler) http.Handler {
 		}
 
 		log.Printf("%v: запрос OrderItems из кеша/бд, OrderID: %v\n", a.name, orderIDstr)
-		orderOut, err := a.csh.GetOrderOutById(orderID)
+		orderitems, err := a.csh.GetOrderOutById(orderID)
 		if err != nil {
 			log.Printf("%v: ошибка получения OrderItems из базы данных: %v\n", a.name, err)
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound) // 404
 			return
 		}
-		ctx := context.WithValue(r.Context(), orderKey, orderOut)
+		ctx := context.WithValue(r.Context(), orderKey, orderitems)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-// Обработчик главной страницы http://localhost:3333
 func (a *Joint) WellcomeHandler(w http.ResponseWriter, r *http.Request) {
-	// Установка ответа для браузера, что страница загрузилась
-	t, err := template.ParseFiles("ui/templates/order.html")
+
+	t, err := template.ParseFiles("ui/templates/orders.html")
 	if err != nil {
 		log.Printf("%v: getOrder(): ошибка парсинга шаблона html: %s\n", a.name, err)
 		http.Error(w, "Internal Server Error", 500)
@@ -154,14 +142,13 @@ func (a *Joint) WellcomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	err = t.ExecuteTemplate(w, "order.html", nil)
+	err = t.ExecuteTemplate(w, "orders.html", nil)
 	if err != nil {
 		log.Printf("%v: WellcomeHandler(): ошибка выполнения шаблона html: %s\n", a.name, err)
 		return
 	}
 }
 
-// Хендлер запроса Order
 func (a *Joint) GetOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	OrderItems, ok := ctx.Value(orderKey).(*db.OrderItems)
@@ -171,8 +158,7 @@ func (a *Joint) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Установка ответа для браузера, что страница загрузилась
-	t, err := template.ParseFiles("ui/templates/order.html")
+	t, err := template.ParseFiles("ui/templates/orders.html")
 	if err != nil {
 		log.Printf("%v: getOrder(): ошибка парсинга шаблона html: %s\n", a.name, err)
 		http.Error(w, "Internal Server Error", 500)
@@ -180,7 +166,7 @@ func (a *Joint) GetOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	t.ExecuteTemplate(w, "order.html", OrderItems)
+	t.ExecuteTemplate(w, "orders.html", OrderItems)
 	if err != nil {
 		log.Printf("%v: GetOrder(): ошибка выполнения шаблона html: %s\n", a.name, err)
 		return

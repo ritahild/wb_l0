@@ -3,6 +3,8 @@ package streaming
 import (
 	"Sirserve/db"
 	"encoding/json"
+	"strconv"
+
 	"log"
 	"os"
 
@@ -23,12 +25,59 @@ func NewPublisher(conn *stan.Conn) *Publisher {
 
 func (p *Publisher) Publish() {
 
-	item1 := db.OrderItems{ChrtID: 1, TrackNumber: "2", Price: 10, Rid: "rid 1", Name: "T-Shirt-4", Sale: 9, Size: "M", TotalPrice: 13, NmID: 1, Brand: "Adidas"}
-	item2 := db.OrderItems{ChrtID: 2, Price: 12, Rid: "rid 2", Name: "Jeans", Sale: 11, Size: "S", TotalPrice: 14, NmID: 2, Brand: "Collins"}
-	item3 := db.OrderItems{ChrtID: 3, Price: 18, Rid: "rid 3", Name: "Sneakers", Sale: 15, Size: "M", TotalPrice: 20, NmID: 1, Brand: "Nike"}
+	item1 := db.OrderItems{
+		OrderUID:    strconv.Itoa(1),
+		TotalPrice:  13,
+		TrackNumber: "2",
+		NmID:        1,
+		Name:        "T-Shirt-4",
+		Sale:        9,
+		Size:        "M",
+		Price:       10,
+		Rid:         "rid 1",
+		Brand:       "Adidas",
+		ChrtID:      1,
+		Status:      "red",
+	}
+	item2 := db.OrderItems{
+		OrderUID:    strconv.Itoa(2),
+		TotalPrice:  14,
+		TrackNumber: "3",
+		NmID:        2,
+		Name:        "Jeans",
+		Sale:        11,
+		Size:        "S",
+		Price:       12,
+		Rid:         "rid 2",
+		Brand:       "Collins",
+		ChrtID:      2,
+		Status:      "gren",
+	}
+	payment := db.Payment{
+		Transaction: "tran 1",
 
-	order := db.Order{OrderUID: "Order 2", Entry: "2", InternalSignature: "IS 2", Items: []db.OrderItems{item1, item2, item3},
-		Locale: "Ru", CustomerID: "2", SmID: 2}
+		Currency:     "Rub",
+		Provider:     "Provider 1",
+		Amount:       47,
+		PaymentDt:    2,
+		Bank:         "VTB",
+		DeliveryCost: 7,
+		GoodsTotal:   3,
+	}
+
+	order := db.Order{
+		OrderUID:          strconv.Itoa(2),
+		Entry:             "2",
+		InternalSignature: "IS 2",
+		Locale:            "Ru",
+		CustomerID:        "2",
+		DeliveryService:   "meest",
+		Payment:           payment,
+		Items:             []db.OrderItems{item1, item2},
+
+		Shardkey: "6",
+		SmID:     2,
+	}
 	orderData, err := json.Marshal(order)
 	if err != nil {
 		log.Printf("%s: json.Marshal error: %v\n", p.name, err)
